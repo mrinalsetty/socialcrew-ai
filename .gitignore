@@ -1,3 +1,24 @@
+# virtualenvs & secrets
+.venv/
+venv/
+env/
 .env
+.env.*
+
+# Python cruft
 __pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+build/
+dist/
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS / editors
 .DS_Store
+.idea/
+.vscode/
