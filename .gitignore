@@ -15,13 +15,12 @@ __pycache__/
 *.egg-info/
 *.lock
 
-# Project-generated files
-analytics_summary.md
-report.md
-social_posts.json
+# Project-generated files (in backend/)
+backend/analytics_summary.md
+backend/report.md
+backend/social_posts.json
+backend/.env
 
-# VSCode
+# Editor / OS junk
 .vscode/
-
-# OS junk
 .DS_Store
