@@ -44,7 +44,9 @@ export async function GET() {
       }
 
       const preferred = env.PYTHON_BIN && String(env.PYTHON_BIN).trim();
-      const candidates = [preferred || "", "python3", "python"].filter(Boolean) as string[];
+      const candidates = [preferred || "", "python3", "python"].filter(
+        Boolean
+      ) as string[];
       let child: ReturnType<typeof spawn> | null = null;
 
       function trySpawn(index: number) {
