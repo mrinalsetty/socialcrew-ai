@@ -6,6 +6,26 @@ import path from "path";
 import fs from "fs";
 
 export async function GET(req: Request) {
+  // If deploying on Vercel, set BACKEND_URL and we'll proxy to the backend instead of spawning Python
+  const backendHttp =
+    process.env.BACKEND_URL && String(process.env.BACKEND_URL).trim();
+  if (backendHttp) {
+    const inUrl = new URL(req.url);
+    const topic = (inUrl.searchParams.get("topic") || "").trim();
+    const base = backendHttp.replace(/\/$/, "");
+    const target = `${base}/run${
+      topic ? `?topic=${encodeURIComponent(topic)}` : ""
+    }`;
+    const res = await fetch(target, {
+      headers: { accept: "text/event-stream" },
+    });
+    // Pass-through SSE body and set appropriate headers
+    const headers = new Headers();
+    headers.set("Content-Type", "text/event-stream; charset=utf-8");
+    headers.set("Cache-Control", "no-cache, no-transform");
+    headers.set("Connection", "keep-alive");
+    return new Response(res.body, { status: res.status, headers });
+  }
   const encoder = new TextEncoder();
   const backendDir = path.join(process.cwd(), "..", "backend");
   // Merge backend/.env into environment for the child process
