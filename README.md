@@ -15,9 +15,11 @@ pip install uv
 Next, navigate to your project directory and install the dependencies:
 
 (Optional) Lock the dependencies and install them by using the CLI command:
+
 ```bash
 crewai install
 ```
+
 ### Customizing
 
 **Add your `OPENAI_API_KEY` into the `.env` file**
@@ -37,7 +39,25 @@ $ crewai run
 
 This command initializes the socialcrew-ai Crew, assembling the agents and assigning them tasks as defined in your configuration.
 
-This example, unmodified, will run the create a `report.md` file with the output of a research on LLMs in the root folder.
+This example, unmodified, will generate two output files when you run the crew:
+
+- `analytics_summary.md` — a markdown file with the analytics summary produced by the crew.
+- `social_posts.json` — a JSON file containing the generated social posts.
+
+Note: older documentation mentioned `report.md`; the current code writes the files above instead.
+
+Run the crew locally (from the repository root) with the following minimal command. It sets the Python path so the package under `backend/src` is importable and calls the `run()` helper in `main.py`:
+
+```bash
+PYTHONPATH=backend/src python -c "from socialcrew_ai import main; main.run()"
+```
+
+If you prefer to run the module directly, you can run from the `backend/` folder:
+
+```bash
+cd backend
+python -m socialcrew_ai.main
+```
 
 ## Understanding Your Crew
 
@@ -46,6 +66,7 @@ The socialcrew-ai Crew is composed of multiple AI agents, each with unique roles
 ## Support
 
 For support, questions, or feedback regarding the SocialcrewAi Crew or crewAI.
+
 - Visit our [documentation](https://docs.crewai.com)
 - Reach out to us through our [GitHub repository](https://github.com/joaomdmoura/crewai)
 - [Join our Discord](https://discord.com/invite/X4JWnZnxPb)
