@@ -6,10 +6,10 @@ import path from "path";
 
 export async function GET(
   _req: Request,
-  { params }: { params: { name: string } }
+  ctx: { params: Promise<{ name: string }> }
 ) {
   try {
-    const name = params.name;
+    const { name } = await ctx.params;
     // Allow only simple filenames and specific extensions
     if (!/^[A-Za-z0-9._-]+\.(md|json|txt)$/.test(name)) {
       return NextResponse.json({ error: "Invalid filename" }, { status: 400 });
