@@ -20,6 +20,7 @@ backend/analytics_summary.md
 backend/report.md
 backend/social_posts.json
 backend/.env
+backend/run.log
 
 # Editor / OS junk
 .vscode/

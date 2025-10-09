@@ -1,10 +1,38 @@
 from crewai import Agent, Crew, Process, Task
+import os
+from typing import Optional
 from crewai.project import CrewBase, agent, crew, task
 from crewai.agents.agent_builder.base_agent import BaseAgent
 from typing import List
 # If you want to run a snippet of code before or after the crew starts,
 # you can use the @before_kickoff and @after_kickoff decorators
 # https://docs.crewai.com/concepts/crews#example-crew-class-with-decorators
+
+def _build_llm_from_env():
+    """Create an LLM instance from environment without hardcoding provider in the route.
+    Supports Groq (OpenAI-compatible endpoint) and OpenAI out of the box.
+    Returns None if LLM class is unavailable or no keys are set; Agent defaults will apply.
+    """
+    try:
+        from crewai import LLM  # type: ignore
+    except Exception:
+        return None
+
+    # Groq via OpenAI-compatible endpoint
+    groq_key = os.environ.get("GROQ_API_KEY")
+    if groq_key:
+        model = os.environ.get("GROQ_MODEL")
+        base_url = os.environ.get("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
+        return LLM(model=model, api_key=groq_key, base_url=base_url)
+
+    # OpenAI
+    openai_key = os.environ.get("OPENAI_API_KEY")
+    if openai_key:
+        model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+        return LLM(model=model, api_key=openai_key)
+
+    return None
+
 
 @CrewBase
 class SocialcrewAi():
@@ -21,17 +49,25 @@ class SocialcrewAi():
     # https://docs.crewai.com/concepts/agents#agent-tools
     @agent
     def content_creator(self) -> Agent:
-        return Agent(
+        llm = _build_llm_from_env()
+        kwargs = dict(
             config=self.agents_config['content_creator'], # type: ignore[index]
-            verbose=True
+            verbose=True,
         )
+        if llm is not None:
+            kwargs["llm"] = llm
+        return Agent(**kwargs)
 
     @agent
     def social_analyst(self) -> Agent:
-        return Agent(
+        llm = _build_llm_from_env()
+        kwargs = dict(
             config=self.agents_config['social_analyst'], # type: ignore[index]
-            verbose=True
+            verbose=True,
         )
+        if llm is not None:
+            kwargs["llm"] = llm
+        return Agent(**kwargs)
 
     # To learn more about structured task outputs,
     # task dependencies, and task callbacks, check out the documentation:

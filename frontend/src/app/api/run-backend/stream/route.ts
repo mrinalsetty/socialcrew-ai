@@ -1,11 +1,11 @@
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-import { spawn } from "child_process";
+import { spawn, type ChildProcess } from "child_process";
 import path from "path";
 import fs from "fs";
 
-export async function GET() {
+export async function GET(req: Request) {
   const encoder = new TextEncoder();
   const backendDir = path.join(process.cwd(), "..", "backend");
   // Merge backend/.env into environment for the child process
@@ -33,6 +33,12 @@ export async function GET() {
     // ignore .env parse errors; process.env still available
   }
 
+  const url = new URL(req.url);
+  const topic = (url.searchParams.get("topic") || "").trim();
+  if (topic) {
+    env.TOPIC = topic;
+  }
+
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       function writeSse(line: string) {
@@ -43,50 +49,103 @@ export async function GET() {
         controller.enqueue(encoder.encode(`data: ${data}\n\n`));
       }
 
-      const preferred = env.PYTHON_BIN && String(env.PYTHON_BIN).trim();
-      const candidates = [preferred || "", "python3", "python"].filter(
-        Boolean
-      ) as string[];
-      let child: ReturnType<typeof spawn> | null = null;
+      // Echo the topic and basic env for visibility
+      if (topic) {
+        writeSse(`Topic received: ${topic}`);
+      } else {
+        writeSse("No topic provided. Backend will use default.");
+      }
+      writeSse(`PYTHON_BIN: ${env.PYTHON_BIN || "not set"}`);
+      writeSse(`PYTHONPATH: ${env.PYTHONPATH || "not set"}`);
 
-      function trySpawn(index: number) {
-        const bin = candidates[index];
-        try {
-          child = spawn(bin, ["-m", "socialcrew_ai.main"], {
-            cwd: backendDir,
-            env,
-            shell: false,
-          });
-        } catch {
-          child = null;
-        }
-        if (!child) {
-          if (index + 1 < candidates.length) return trySpawn(index + 1);
-          writeEvent("error", "Unable to spawn Python process");
-          controller.close();
-          return;
-        }
-        writeSse(`Using interpreter: ${bin}`);
-
-        if (child.stdout) {
-          child.stdout.setEncoding("utf8");
-          child.stdout.on("data", (d: string) => {
-            d.split(/\r?\n/).forEach((line) => line && writeSse(line));
-          });
-        }
-        if (child.stderr) {
-          child.stderr.setEncoding("utf8");
-          child.stderr.on("data", (d: string) => {
-            d.split(/\r?\n/).forEach((line) => line && writeSse(line));
-          });
-        }
-        child.on("close", (code) => {
-          writeEvent("done", String(code ?? -1));
-          controller.close();
-        });
+      // Preflight: detect any *_API_KEY in env and log it (non-blocking)
+      const detectedKeys = Object.keys(env).filter((k) => /_API_KEY$/.test(k));
+      if (detectedKeys.length === 0) {
+        writeSse(
+          "No provider API key detected in environment. Proceeding anyway."
+        );
+        writeSse("Set your key(s) in backend/.env (e.g., GROQ_API_KEY=...)");
+      } else {
+        writeSse(`Detected provider keys: ${detectedKeys.join(", ")}`);
       }
 
-      trySpawn(0);
+      const preferred = env.PYTHON_BIN && String(env.PYTHON_BIN).trim();
+      const venvCrewai = path.join(backendDir, ".venv", "bin", "crewai");
+      let child: ChildProcess | null = null;
+
+      function spawnCliOrPython() {
+        // 1) Prefer venv CrewAI CLI if available
+        if (fs.existsSync(venvCrewai)) {
+          writeSse(`Using CLI: ${venvCrewai} run`);
+          try {
+            child = spawn(venvCrewai, ["run"], {
+              cwd: backendDir,
+              env,
+              shell: false,
+            });
+            return;
+          } catch {
+            child = null;
+          }
+        }
+
+        // 2) Fall back to Python module
+        const candidates = [preferred || "", "python3", "python"].filter(
+          Boolean
+        ) as string[];
+        for (const bin of candidates) {
+          try {
+            child = spawn(bin, ["-m", "socialcrew_ai.main"], {
+              cwd: backendDir,
+              env,
+              shell: false,
+            });
+            writeSse(`Using interpreter: ${bin}`);
+            return;
+          } catch {
+            child = null;
+          }
+        }
+      }
+
+      // Spawn the backend process now
+      spawnCliOrPython();
+      if (!child) {
+        writeEvent("error", "Unable to spawn CrewAI CLI or Python process");
+        controller.close();
+        return;
+      }
+
+      // Attach listeners
+      const proc = child as ChildProcess;
+      if (proc.stdout) {
+        proc.stdout.setEncoding("utf8");
+        proc.stdout.on("data", (d: string) => {
+          d.split(/\r?\n/).forEach((line) => line && writeSse(line));
+        });
+      }
+      if (proc.stderr) {
+        proc.stderr.setEncoding("utf8");
+        proc.stderr.on("data", (d: string) => {
+          d.split(/\r?\n/).forEach((line) => line && writeSse(line));
+        });
+      }
+      proc.on("close", (code: number) => {
+        const outJson = path.join(backendDir, "social_posts.json");
+        const outMd = path.join(backendDir, "analytics_summary.md");
+        const logFile = path.join(backendDir, "run.log");
+        writeSse(`Process exited with code: ${String(code ?? -1)}`);
+        writeSse(`Backend CWD was: ${backendDir}`);
+        writeSse(
+          `Check output: social_posts.json exists? ${fs.existsSync(outJson)}`
+        );
+        writeSse(
+          `Check output: analytics_summary.md exists? ${fs.existsSync(outMd)}`
+        );
+        writeSse(`Check log: run.log exists? ${fs.existsSync(logFile)}`);
+        writeEvent("done", String(code ?? -1));
+        controller.close();
+      });
     },
     cancel() {
       // client disconnected; nothing special to do
