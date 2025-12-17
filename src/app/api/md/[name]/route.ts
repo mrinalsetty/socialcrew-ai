@@ -11,7 +11,6 @@ export async function GET(
   try {
     const { name } = await context.params;
 
-    // Only allow simple filenames ending with .md (no path separators)
     if (!/^[A-Za-z0-9._-]+\.md$/.test(name)) {
       return NextResponse.json({ error: "Invalid filename" }, { status: 400 });
     }
