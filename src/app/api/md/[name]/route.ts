@@ -6,10 +6,10 @@ import path from "path";
 
 export async function GET(
   _req: Request,
-  { params }: { params: { name: string } }
+  context: { params: Promise<{ name: string }> }
 ) {
   try {
-    const name = params.name;
+    const { name } = await context.params;
 
     // Only allow simple filenames ending with .md (no path separators)
     if (!/^[A-Za-z0-9._-]+\.md$/.test(name)) {
